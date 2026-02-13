@@ -10,8 +10,8 @@ workloads:
     payload_bytes: 1024
     cluster_nodes: 3
     target_throughput_msg_s:
-      containerized: 50000
-      tachyon: 400000
+      containerized: 500000
+      tachyon: 4000000
     e2e_latency_p99_ms:
       containerized: 200
       tachyon: 5
