@@ -1,47 +1,49 @@
 # ATR Core Server (Class D)
 
-**ATR (Aetherium Transmission & Retrieval)** is a Class D Deep Core Server 
-serving as the Ground Truth Authority of the AETHERIUM GENESIS ecosystem.
+ATR (Aetherium Transmission & Retrieval) is a **Class D Deep Core Server**.
+It serves as a **Ground Truth Authority** for deterministic event admission, immutable truth recording, and canonical stream publication.
 
-It is not an application server.
-It is not a runtime.
-It is not an orchestrator.
+ATR Core is not an application runtime and must remain business-logic agnostic.
 
-ATR is a structural sovereign layer that enforces truth.
+## Core Principles
 
----
+- Determinism-first behavior
+- Immutable truth model
+- Mandatory validation and signature enforcement
+- Predictable failure behavior under stress
 
-## 🧠 Architectural Classification
+## Architecture Model
 
-**Class D – Deep Core**
+ATR follows a **3-Axis Architecture**:
 
-ATR acts as:
+1. **Transport** — AetherBusExtreme / JetStream backbone
+2. **Immune System** — schema + canonicalization + signature + ruleset enforcement
+3. **State Authority** — E3 Hybrid (`Immutable Log + Materialized Snapshot`)
 
-- Nervous System (Transport Layer)
-- Immune System (Validation & Enforcement)
-- State Authority (E3 Hybrid Truth Model)
+See full architecture details in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-It does not "think".
-It **knows** and **enforces**.
+## Technical and Governance References
 
----
+- Technical specification: [`SPEC.md`](SPEC.md)
+- Contributor policy: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Invariants policy (normative): [`AGENTS.md`](AGENTS.md)
+- Benchmark contract: [`specs/benchmark_contract.yaml`](specs/benchmark_contract.yaml)
 
-## 🧩 3-Axis Core Architecture
+## Repository Layout
 
-### Axis 1 — AetherBusExtreme (Transport)
-- Event-driven backbone
-- NATS JetStream foundation
-- Designed for ultra-low latency
-- Tachyon-ready (RDMA / Unikernel)
+```text
+cmd/           Binary entrypoints
+core/          Class D core logic boundaries
+internal/      Internal deterministic utilities
+api/           External gate interfaces
+specs/         Contracts and protocol specifications
+configs/       Deployment/runtime profiles
+deployments/   Deployment manifests and packaging
+tests/         Unit/integration/replay/failure suites
+scripts/       Benchmark and verification entrypoints
+```
 
-### Axis 2 — Immune System
-- AkashicEnvelope Schema enforcement
-- Deterministic canonicalization
-- Signature verification (Ed25519)
-- Inspira rule enforcement
+## Status
 
-Invalid events are quarantined.
-
-### Axis 3 — State Authority (E3 Hybrid)
-
-Truth Model:
+This repository is structured for production-grade governance with Class D constraints.
+Implementation should evolve without violating deterministic and security invariants.

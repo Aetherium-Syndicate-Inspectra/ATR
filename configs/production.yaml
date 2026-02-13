@@ -1,0 +1,10 @@
+profile: production
+transport:
+  backend: jetstream
+  replicas: 3
+state:
+  truth_model: e3_hybrid
+security:
+  signature_required: true
+  schema_required: true
+  quarantine_required: true
