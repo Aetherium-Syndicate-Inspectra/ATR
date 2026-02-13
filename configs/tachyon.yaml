@@ -1,0 +1,11 @@
+profile: tachyon
+transport:
+  backend: aetherbus_extreme
+  kernel_bypass: true
+state:
+  truth_model: e3_hybrid
+performance:
+  mode: low_latency
+security:
+  signature_required: true
+  schema_required: true
