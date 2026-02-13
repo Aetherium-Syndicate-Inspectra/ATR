@@ -4,22 +4,12 @@
   "title": "AkashicEnvelope v2",
   "type": "object",
   "additionalProperties": false,
-  "required": [
-    "header",
-    "payload",
-    "signature"
-  ],
+  "required": ["header", "payload", "signature"],
   "properties": {
     "header": {
       "type": "object",
       "additionalProperties": false,
-      "required": [
-        "id",
-        "timestamp",
-        "source_agent",
-        "type",
-        "version"
-      ],
+      "required": ["id", "timestamp", "source_agent", "type", "version"],
       "properties": {
         "id": {
           "type": "string",
@@ -50,27 +40,19 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "correlation_id": {
-          "type": "string"
-        },
+        "correlation_id": { "type": "string" },
         "causal_hash": {
           "type": "string",
           "description": "Hash of previous envelope or causal chain pointer"
         },
         "security_level": {
           "type": "string",
-          "enum": [
-            "public",
-            "confidential",
-            "secret"
-          ]
+          "enum": ["public", "confidential", "secret"]
         },
         "context_refs": {
           "type": "array",
           "description": "Pointers to external context to avoid payload bloat",
-          "items": {
-            "type": "string"
-          }
+          "items": { "type": "string" }
         }
       }
     },
@@ -81,8 +63,7 @@
     "signature": {
       "type": "string",
       "minLength": 16,
-      "description": "Ed25519 signature over BLAKE3(canonical_bytes(header+meta+payload)), base64url without padding",
-      "pattern": "^[A-Za-z0-9_-]{16,}$"
+      "description": "Ed25519 signature over canonical_bytes(header+meta+payload)"
     }
   }
 }
