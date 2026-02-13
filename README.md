@@ -28,6 +28,8 @@ See full architecture details in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 - Contributor policy: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Invariants policy (normative): [`AGENTS.md`](AGENTS.md)
 - Benchmark contract: [`specs/benchmark_contract.yaml`](specs/benchmark_contract.yaml)
+- Three-tier performance model: [`docs/AETHERBUS_TACHYON_SPEC_TH.md`](docs/AETHERBUS_TACHYON_SPEC_TH.md)
+- Formula estimator tool: [`tools/perf_estimator.py`](tools/perf_estimator.py)
 
 ## Repository Layout
 
