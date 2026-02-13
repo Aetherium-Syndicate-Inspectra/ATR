@@ -3,8 +3,40 @@ name: ATR Core CI (Validation + Python Gates)
 on:
   pull_request:
     branches: ["main"]
+    paths:
+      - 'specs/**/*.yaml'
+      - 'specs/**/*.yml'
+      - 'specs/**/*.json'
+      - 'core/**/*.py'
+      - 'core/**/*.ts'
+      - 'core/**/*.go'
+      - 'core/**/*.rs'
+      - 'gateway/**/*.py'
+      - 'gateway/**/*.ts'
+      - 'gateway/**/*.go'
+      - 'gateway/**/*.rs'
+      - 'worker/**/*.py'
+      - 'worker/**/*.ts'
+      - 'worker/**/*.go'
+      - 'worker/**/*.rs'
   push:
     branches: ["main"]
+    paths:
+      - 'specs/**/*.yaml'
+      - 'specs/**/*.yml'
+      - 'specs/**/*.json'
+      - 'core/**/*.py'
+      - 'core/**/*.ts'
+      - 'core/**/*.go'
+      - 'core/**/*.rs'
+      - 'gateway/**/*.py'
+      - 'gateway/**/*.ts'
+      - 'gateway/**/*.go'
+      - 'gateway/**/*.rs'
+      - 'worker/**/*.py'
+      - 'worker/**/*.ts'
+      - 'worker/**/*.go'
+      - 'worker/**/*.rs'
 
 concurrency:
   group: atr-core-validation-${{ github.ref }}
@@ -22,7 +54,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run_checks: ${{ steps.filter.outputs.run_checks }}
-      docs_only: ${{ steps.filter.outputs.docs_only }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -48,11 +79,6 @@ jobs:
               - 'worker/**/*.ts'
               - 'worker/**/*.go'
               - 'worker/**/*.rs'
-              - 'python/**/*.py'
-              - 'api/**/*.py'
-              - 'internal/**/*.py'
-              - 'scripts/**/*.py'
-              - 'tests/**/*.py'
               - 'specs/**/AkashicEnvelope*.json'
               - 'specs/**/akashicenvelope*.json'
               - 'specs/**/ruleset*.json'
@@ -60,10 +86,6 @@ jobs:
               - 'specs/**/ruleset*.yml'
               - 'specs/**/benchmark_contract*.yaml'
               - 'specs/**/benchmark_contract*.yml'
-            docs_only:
-              - '**/*.md'
-              - '**/*.drawio'
-              - '**/*.svg'
 
   python-validation:
     name: python-validation
