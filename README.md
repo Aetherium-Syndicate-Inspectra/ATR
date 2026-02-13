@@ -34,15 +34,15 @@ See full architecture details in [`ARCHITECTURE.md`](ARCHITECTURE.md).
 ## Repository Layout
 
 ```text
-cmd/           Binary entrypoints
-core/          Class D core logic boundaries
-internal/      Internal deterministic utilities
-api/           External gate interfaces
+python/        ATR Core Python package (API, immune pipeline, tests)
+sidecar/       ATB-ET Rust transport adapter
+proto/         Transport protocol contracts
 specs/         Contracts and protocol specifications
 configs/       Deployment/runtime profiles
-deployments/   Deployment manifests and packaging
-tests/         Unit/integration/replay/failure suites
+docs/          Architecture/performance documentation
+monitoring/    Metrics/dashboard assets
 scripts/       Benchmark and verification entrypoints
+tools/         Contract/performance helper tools
 ```
 
 ## Status

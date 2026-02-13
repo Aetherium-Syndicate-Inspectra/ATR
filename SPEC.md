@@ -6,7 +6,7 @@ All incoming payloads must conform to AkashicEnvelope v2 contract.
 
 Required envelope fields:
 - `header.id` (uuid-v7)
-- `header.timestamp_ns`
+- `header.timestamp`
 - `header.source_agent`
 - `payload`
 - `signature` (Ed25519)
