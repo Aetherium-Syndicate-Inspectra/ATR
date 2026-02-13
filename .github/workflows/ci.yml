@@ -3,8 +3,40 @@ name: ATR Core CI (Python Package + Sidecar)
 on:
   pull_request:
     branches: ["main"]
+    paths:
+      - 'specs/**/*.yaml'
+      - 'specs/**/*.yml'
+      - 'specs/**/*.json'
+      - 'core/**/*.py'
+      - 'core/**/*.ts'
+      - 'core/**/*.go'
+      - 'core/**/*.rs'
+      - 'gateway/**/*.py'
+      - 'gateway/**/*.ts'
+      - 'gateway/**/*.go'
+      - 'gateway/**/*.rs'
+      - 'worker/**/*.py'
+      - 'worker/**/*.ts'
+      - 'worker/**/*.go'
+      - 'worker/**/*.rs'
   push:
     branches: ["main"]
+    paths:
+      - 'specs/**/*.yaml'
+      - 'specs/**/*.yml'
+      - 'specs/**/*.json'
+      - 'core/**/*.py'
+      - 'core/**/*.ts'
+      - 'core/**/*.go'
+      - 'core/**/*.rs'
+      - 'gateway/**/*.py'
+      - 'gateway/**/*.ts'
+      - 'gateway/**/*.go'
+      - 'gateway/**/*.rs'
+      - 'worker/**/*.py'
+      - 'worker/**/*.ts'
+      - 'worker/**/*.go'
+      - 'worker/**/*.rs'
 
 concurrency:
   group: atr-core-build-${{ github.ref }}
@@ -27,26 +59,16 @@ jobs:
         with:
           filters: |
             python_related:
-              - '**/*.py'
-              - 'python/**'
-              - 'api/**'
-              - 'core/**'
-              - 'gateway/**'
-              - 'worker/**'
-              - 'internal/**'
-              - 'tests/**'
-              - 'scripts/**'
+              - 'core/**/*.py'
+              - 'gateway/**/*.py'
+              - 'worker/**/*.py'
               - 'specs/**/*.yaml'
               - 'specs/**/*.yml'
               - 'specs/**/*.json'
-              - 'configs/**/*.yaml'
-              - 'configs/**/*.yml'
             rust_related:
-              - '**/*.rs'
-              - 'sidecar/**'
-              - 'core/**'
-              - 'gateway/**'
-              - 'worker/**'
+              - 'core/**/*.rs'
+              - 'gateway/**/*.rs'
+              - 'worker/**/*.rs'
               - 'specs/**/*.yaml'
               - 'specs/**/*.yml'
               - 'specs/**/*.json'

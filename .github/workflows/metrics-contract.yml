@@ -3,8 +3,44 @@ name: Metrics Contract Guard
 on:
   pull_request:
     branches: ["main"]
+    paths:
+      - 'specs/**/*.yaml'
+      - 'specs/**/*.yml'
+      - 'specs/**/*.json'
+      - 'core/**/*.py'
+      - 'core/**/*.ts'
+      - 'core/**/*.go'
+      - 'core/**/*.rs'
+      - 'gateway/**/*.py'
+      - 'gateway/**/*.ts'
+      - 'gateway/**/*.go'
+      - 'gateway/**/*.rs'
+      - 'worker/**/*.py'
+      - 'worker/**/*.ts'
+      - 'worker/**/*.go'
+      - 'worker/**/*.rs'
+      - 'tools/metrics_contract_check.py'
+      - 'monitoring/**'
   push:
     branches: ["main"]
+    paths:
+      - 'specs/**/*.yaml'
+      - 'specs/**/*.yml'
+      - 'specs/**/*.json'
+      - 'core/**/*.py'
+      - 'core/**/*.ts'
+      - 'core/**/*.go'
+      - 'core/**/*.rs'
+      - 'gateway/**/*.py'
+      - 'gateway/**/*.ts'
+      - 'gateway/**/*.go'
+      - 'gateway/**/*.rs'
+      - 'worker/**/*.py'
+      - 'worker/**/*.ts'
+      - 'worker/**/*.go'
+      - 'worker/**/*.rs'
+      - 'tools/metrics_contract_check.py'
+      - 'monitoring/**'
 
 concurrency:
   group: metrics-contract-${{ github.ref }}
@@ -27,19 +63,21 @@ jobs:
         with:
           filters: |
             run_metrics_guard:
-              - '**/*.py'
-              - '**/*.rs'
-              - '**/*.go'
-              - '**/*.ts'
               - 'specs/**/*.yaml'
               - 'specs/**/*.yml'
               - 'specs/**/*.json'
-              - 'core/**/*.yaml'
-              - 'core/**/*.yml'
-              - 'gateway/**/*.yaml'
-              - 'gateway/**/*.yml'
-              - 'worker/**/*.yaml'
-              - 'worker/**/*.yml'
+              - 'core/**/*.py'
+              - 'core/**/*.ts'
+              - 'core/**/*.go'
+              - 'core/**/*.rs'
+              - 'gateway/**/*.py'
+              - 'gateway/**/*.ts'
+              - 'gateway/**/*.go'
+              - 'gateway/**/*.rs'
+              - 'worker/**/*.py'
+              - 'worker/**/*.ts'
+              - 'worker/**/*.go'
+              - 'worker/**/*.rs'
               - 'tools/metrics_contract_check.py'
               - 'monitoring/**'
 
