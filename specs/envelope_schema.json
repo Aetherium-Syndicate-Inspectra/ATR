@@ -2,10 +2,31 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "http://aetherium.genesis/schemas/envelope/v2",
   "title": "AkashicEnvelope v2",
+  "description": "Canonical envelope schema for ATR ingress validation.",
   "type": "object",
   "additionalProperties": false,
   "required": ["header", "payload", "signature"],
   "properties": {
+    "header": {
+      "$ref": "#/$defs/header"
+    },
+    "meta": {
+      "$ref": "#/$defs/meta"
+    },
+    "payload": {
+      "type": "object",
+      "description": "Type-specific payload; validated by ruleset/type registry.",
+      "minProperties": 1
+    },
+    "signature": {
+      "type": "string",
+      "description": "Ed25519 signature over canonical_bytes(header+meta+payload).",
+      "minLength": 86,
+      "maxLength": 88,
+      "pattern": "^[A-Za-z0-9+/=_-]+$"
+    }
+  },
+  "$defs": {
     "header": {
       "type": "object",
       "additionalProperties": false,
@@ -13,22 +34,27 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "UUIDv7 (time-ordered) string"
+          "description": "UUIDv7 string (lowercase canonical form).",
+          "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$"
         },
         "timestamp": {
           "type": "integer",
           "minimum": 0,
-          "description": "Unix time in nanoseconds (telemetry; ordering uses broker seq)"
+          "description": "Unix timestamp in nanoseconds."
         },
         "source_agent": {
           "type": "string",
+          "description": "Stable identity (public key fingerprint or DID).",
           "minLength": 8,
-          "description": "Public key or identity hash"
+          "maxLength": 256,
+          "pattern": "^[A-Za-z0-9:_\\-.]+$"
         },
         "type": {
           "type": "string",
-          "minLength": 1,
-          "description": "Event type e.g. intent.created, state.mutation"
+          "description": "Event type (dot-separated taxonomy).",
+          "minLength": 3,
+          "maxLength": 128,
+          "pattern": "^[a-z][a-z0-9_]*(\\.[a-z][a-z0-9_]*)+$"
         },
         "version": {
           "type": "string",
@@ -40,10 +66,15 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "correlation_id": { "type": "string" },
+        "correlation_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
         "causal_hash": {
           "type": "string",
-          "description": "Hash of previous envelope or causal chain pointer"
+          "description": "Hex SHA-256 digest pointing to prior causal envelope.",
+          "pattern": "^[a-f0-9]{64}$"
         },
         "security_level": {
           "type": "string",
@@ -51,19 +82,16 @@
         },
         "context_refs": {
           "type": "array",
-          "description": "Pointers to external context to avoid payload bloat",
-          "items": { "type": "string" }
+          "description": "Immutable context pointers used by the payload.",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 512
+          },
+          "maxItems": 32,
+          "uniqueItems": true
         }
       }
-    },
-    "payload": {
-      "type": "object",
-      "description": "Type-specific payload. Must be validated by type schema registry."
-    },
-    "signature": {
-      "type": "string",
-      "minLength": 16,
-      "description": "Ed25519 signature over canonical_bytes(header+meta+payload)"
     }
   }
 }
