@@ -7,6 +7,11 @@ from dataclasses import dataclass
 from typing import Any
 
 
+LEGACY_CANONICALIZATION_CODES: dict[str, str] = {
+    "CANON_DUPLICATE_KEY_AFTER_NORMALIZATION": "CANON_DUPLICATE_KEY_AFTER_NORMALIZE",
+}
+
+
 @dataclass(frozen=True)
 class CanonicalizationError(ValueError):
     code: str
@@ -34,12 +39,16 @@ def _normalize(value: Any) -> Any:
             normalized_key = unicodedata.normalize("NFC", key)
             if normalized_key in normalized:
                 raise CanonicalizationError(
-                    "CANON_DUPLICATE_KEY_AFTER_NORMALIZE",
+                    "CANON_DUPLICATE_KEY_AFTER_NORMALIZATION",
                     "duplicate map key after NFC normalization",
                 )
             normalized[normalized_key] = _normalize(inner)
         return normalized
     raise CanonicalizationError("CANON_FORBIDDEN_TYPE", f"unsupported type: {type(value)!r}")
+
+
+def legacy_canonicalization_code(code: str) -> str:
+    return LEGACY_CANONICALIZATION_CODES.get(code, code)
 
 
 def canonical_input(envelope: dict[str, Any]) -> dict[str, Any]:

@@ -41,7 +41,8 @@ sidecar/       ATB-ET Rust transport adapter
 proto/         Transport protocol contracts
 specs/         Contracts and protocol specifications
 configs/       Deployment/runtime profiles
-docs/          Architecture/performance documentation
+docs/          Architecture and operational documentation
+reports/       Generated benchmark/performance reports
 monitoring/    Metrics/dashboard assets
 scripts/       Benchmark and verification entrypoints
 tools/         Contract/performance helper tools
@@ -56,6 +57,7 @@ tools/         Contract/performance helper tools
 - Newcomer onboarding checklist: [`docs/NEWCOMER_ONBOARDING_CHECKLIST.md`](docs/NEWCOMER_ONBOARDING_CHECKLIST.md)
 - Benchmark contract: [`specs/benchmark_contract.yaml`](specs/benchmark_contract.yaml)
 - Performance model: [`docs/AETHERBUS_TACHYON_SPEC_TH.md`](docs/AETHERBUS_TACHYON_SPEC_TH.md)
+- Main performance report: [`reports/atr_performance_report.md`](reports/atr_performance_report.md)
 - Formula estimator tool: [`tools/perf_estimator.py`](tools/perf_estimator.py)
 
 ---
