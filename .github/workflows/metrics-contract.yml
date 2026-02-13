@@ -2,12 +2,51 @@ name: Metrics Contract Guard
 
 on:
   pull_request:
+    branches: ["main"]
   push:
     branches: ["main"]
 
+concurrency:
+  group: metrics-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      run_metrics_guard: ${{ steps.filter.outputs.run_metrics_guard }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Detect metrics-relevant changes
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            run_metrics_guard:
+              - '**/*.py'
+              - '**/*.rs'
+              - '**/*.go'
+              - '**/*.ts'
+              - 'specs/**/*.yaml'
+              - 'specs/**/*.yml'
+              - 'specs/**/*.json'
+              - 'core/**/*.yaml'
+              - 'core/**/*.yml'
+              - 'gateway/**/*.yaml'
+              - 'gateway/**/*.yml'
+              - 'worker/**/*.yaml'
+              - 'worker/**/*.yml'
+              - 'tools/metrics_contract_check.py'
+              - 'monitoring/**'
+
   metrics-contract:
     name: Verify Prometheus metrics contract (static)
+    needs: [changes]
+    if: ${{ needs.changes.outputs.run_metrics_guard == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -22,3 +61,11 @@ jobs:
       - name: Run metrics contract check
         run: |
           python tools/metrics_contract_check.py
+
+  skip:
+    name: metrics-contract-skip
+    needs: [changes]
+    if: ${{ needs.changes.outputs.run_metrics_guard != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No source/schema changes detected; skipping metrics contract guard."

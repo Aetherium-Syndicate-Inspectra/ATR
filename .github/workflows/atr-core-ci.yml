@@ -1,4 +1,4 @@
-name: ATR Core CI
+name: ATR Core CI (Validation + Python Gates)
 
 on:
   pull_request:
@@ -7,7 +7,7 @@ on:
     branches: ["main"]
 
 concurrency:
-  group: atr-core-ci-${{ github.ref }}
+  group: atr-core-validation-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -21,7 +21,7 @@ jobs:
     name: detect-changes
     runs-on: ubuntu-latest
     outputs:
-      relevant: ${{ steps.filter.outputs.relevant }}
+      run_checks: ${{ steps.filter.outputs.run_checks }}
       docs_only: ${{ steps.filter.outputs.docs_only }}
     steps:
       - name: Checkout
@@ -32,32 +32,43 @@ jobs:
         uses: dorny/paths-filter@v3
         with:
           filters: |
-            relevant:
-              - '**/*.go'
-              - '**/*.rs'
-              - '**/*.py'
-              - '**/*.ts'
+            run_checks:
               - 'specs/**/*.yaml'
               - 'specs/**/*.yml'
-              - 'core/**/*.yaml'
-              - 'core/**/*.yml'
-              - 'gateway/**/*.yaml'
-              - 'gateway/**/*.yml'
-              - 'worker/**/*.yaml'
-              - 'worker/**/*.yml'
-              - 'specs/envelope_schema.json'
-              - 'specs/ruleset*.json'
+              - 'specs/**/*.json'
+              - 'core/**/*.py'
+              - 'core/**/*.ts'
+              - 'core/**/*.go'
+              - 'core/**/*.rs'
+              - 'gateway/**/*.py'
+              - 'gateway/**/*.ts'
+              - 'gateway/**/*.go'
+              - 'gateway/**/*.rs'
+              - 'worker/**/*.py'
+              - 'worker/**/*.ts'
+              - 'worker/**/*.go'
+              - 'worker/**/*.rs'
+              - 'python/**/*.py'
+              - 'api/**/*.py'
+              - 'internal/**/*.py'
+              - 'scripts/**/*.py'
+              - 'tests/**/*.py'
+              - 'specs/**/AkashicEnvelope*.json'
+              - 'specs/**/akashicenvelope*.json'
               - 'specs/**/ruleset*.json'
-              - 'specs/benchmark_contract.yaml'
+              - 'specs/**/ruleset*.yaml'
+              - 'specs/**/ruleset*.yml'
+              - 'specs/**/benchmark_contract*.yaml'
+              - 'specs/**/benchmark_contract*.yml'
             docs_only:
               - '**/*.md'
               - '**/*.drawio'
               - '**/*.svg'
 
-  python:
-    name: python
+  python-validation:
+    name: python-validation
     needs: [changes]
-    if: ${{ needs.changes.outputs.relevant == 'true' }}
+    if: ${{ needs.changes.outputs.run_checks == 'true' }}
     runs-on: ubuntu-latest
 
     steps:
@@ -75,10 +86,6 @@ jobs:
           set -euo pipefail
           python -m pip install --upgrade pip
           pip install ruff mypy pytest pyyaml jsonschema
-
-      # ---------------------------
-      # FAILING CHECKS (fail-fast)
-      # ---------------------------
 
       - name: Validate YAML (specs/, configs/)
         run: |
@@ -116,7 +123,6 @@ jobs:
           files = list(specs.rglob("*.json"))
           for f in files:
               obj = json.loads(f.read_text(encoding="utf-8"))
-              # If it looks like a JSON Schema, verify schema validity
               if isinstance(obj, dict) and "$schema" in obj:
                   Draft202012Validator.check_schema(obj)
           print(f"[ok] specs json checked: {len(files)}")
@@ -125,13 +131,11 @@ jobs:
       - name: Ruff (lint)
         run: |
           set -euo pipefail
-          # จำกัดสโคปให้ตรง repo ของคุณ (มี python/, api/, core/, internal/, tests/)
           ruff check python api core internal tests scripts
 
       - name: Mypy (type-check) — blocking
         run: |
           set -euo pipefail
-          # ถ้ายังไม่มี config, mypy จะ fail → นี่คือ failing check ตามที่คุณต้องการ
           mypy python api core internal
 
       - name: Pytest — blocking
@@ -142,7 +146,7 @@ jobs:
   docs-only:
     name: docs-only
     needs: [changes]
-    if: ${{ needs.changes.outputs.relevant != 'true' }}
+    if: ${{ needs.changes.outputs.run_checks != 'true' }}
     runs-on: ubuntu-latest
     steps:
       - run: echo "No source/schema changes detected; skipping lint/test checks."
