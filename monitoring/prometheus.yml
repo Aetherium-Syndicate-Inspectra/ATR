@@ -1,0 +1,43 @@
+global:
+  scrape_interval: 5s
+  evaluation_interval: 5s
+
+rule_files: []
+
+scrape_configs:
+  # Prometheus self-scrape
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  # ATR Control Plane (Python) metrics endpoint
+  # Expose /metrics on port 9100 in your ATR service/container.
+  - job_name: atr_cp
+    metrics_path: /metrics
+    scrape_interval: 2s
+    static_configs:
+      - targets: ["atr:9100"]
+        labels:
+          component: "control_plane"
+
+  # ATR Data Plane (Rust) metrics endpoint
+  # Expose /metrics on port 9200 in your Rust sidecar/service.
+  - job_name: atr_dp
+    metrics_path: /metrics
+    scrape_interval: 2s
+    static_configs:
+      - targets: ["atr-dp:9200"]
+        labels:
+          component: "data_plane"
+
+  # Optional: Node exporter for host metrics
+  - job_name: node
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  # Optional: cAdvisor for container metrics
+  - job_name: cadvisor
+    scrape_interval: 10s
+    static_configs:
+      - targets: ["cadvisor:8080"]
