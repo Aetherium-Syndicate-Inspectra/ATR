@@ -1,0 +1,427 @@
+# ATR Core Server (Class D) — Benchmark Contract v1.0
+# Scope: Core Server Performance + Correctness under 3-Axis Architecture (Transport/Immune/State)
+#
+# Principles
+# - Measure tail latency (P99/P99.9) and saturation behavior, not averages.
+# - Separate Internal latency (in-process) from E2E latency (ingress->persist->ack->consumer-observed).
+# - Treat delivery semantics as "effectively-once" via idempotency + dedup window unless explicitly proven otherwise.
+
+contract:
+  name: "ATR Core Server Benchmark Contract"
+  version: "1.0.0"
+  owner: "Aetherium Genesis / ATR"
+  date: "2026-02-13"
+  status: "draft"
+  applies_to:
+    components:
+      - "Gate 1: Ingress"
+      - "Axis 2: Immune System (schema+canonicalization+signature+ruleset)"
+      - "Axis 1: AetherBusExtreme (JetStream / Tachyon transport)"
+      - "Axis 3: State Authority (state worker + snapshot/KV + ledger/log)"
+    deployment_modes:
+      - "containerized"
+      - "tachyon"
+
+definitions:
+  latency_types:
+    internal_latency_us:
+      description: "Time from publish() to handler.receive() within same process; excludes network/disk."
+      unit: "microseconds"
+    e2e_latency_ms:
+      description: "Ingress -> immune check -> persistence ack -> consumer observed + handler done."
+      unit: "milliseconds"
+    transport_latency_us:
+      description: "Producer->broker->consumer transfer only (no app handler); best-effort measure."
+      unit: "microseconds"
+  delivery_semantics:
+    effectively_once:
+      description: "At-least-once delivery + idempotent apply + dedup window (event_id)."
+    exactly_once:
+      description: "Only claim if proven with formal invariant tests under failure injection."
+  percentiles:
+    required:
+      - "p50"
+      - "p95"
+      - "p99"
+      - "p99_9"
+      - "max"
+
+global_environment:
+  # Goal: apple-to-apple reproducibility
+  hardware:
+    cpu:
+      required: true
+      notes:
+        - "Record model, cores, base clock."
+        - "Disable Turbo Boost / CPU frequency scaling where possible."
+    memory:
+      required: true
+      notes:
+        - "Record RAM size and speed."
+    storage:
+      required: true
+      notes:
+        - "Record device type: SSD/NVMe/NVMe-oF and filesystem."
+    network:
+      required: true
+      notes:
+        - "Record NIC model, link speed, MTU, offload settings."
+  os_runtime:
+    containerized:
+      os: "Linux"
+      notes:
+        - "Record kernel version and cgroup limits."
+        - "Pin CPU sets for NATS + gateways + workers."
+    tachyon:
+      os: "Unikernel or minimal image"
+      notes:
+        - "Record kernel-bypass mode (XDP/eBPF/DPDK/RDMA), queue config, core pinning."
+  time_sync:
+    required: false
+    notes:
+      - "If cross-node ordering is evaluated, record NTP/PTP config."
+  warmup:
+    duration_seconds: 30
+    load_fraction_of_target: 0.10
+  gc_noise_control:
+    python_only:
+      before_test: "gc.collect()"
+      during_test: "disable_automatic_gc_if_possible"
+  run_repetitions:
+    per_workload: 5
+    report: "median_of_runs + best + worst"
+  metrics_collection:
+    required_outputs:
+      - "latency_histogram"
+      - "percentiles"
+      - "throughput_over_time"
+      - "cpu_mem_io_network"
+      - "error_counts_by_type"
+      - "backpressure_events"
+      - "recovery_results"
+      - "audit_quarantine_accuracy"
+
+testbed_topology:
+  cluster:
+    nodes: 3
+    roles:
+      - "nats-jetstream"
+      - "ingress-gateway"
+      - "state-worker"
+    notes:
+      - "Default: JetStream clustered (3 nodes)."
+      - "Ingress and Worker may be sidecars or separate processes; document layout."
+  tenants:
+    default: 1
+    multi_tenant_matrix:
+      enabled: true
+      cases:
+        - tenants: 1
+        - tenants: 10
+        - tenants: 100
+
+envelope_profiles:
+  # Canonical payload sizes used for load generation
+  small_512b:
+    payload_bytes: 512
+    description: "Control signals / heartbeats"
+  medium_1kb:
+    payload_bytes: 1024
+    description: "Telemetry / JSON logs / standard intents"
+  large_4kb:
+    payload_bytes: 4096
+    description: "Heavy consistency / state sync / binary-ish envelope"
+  canonicalization:
+    required: true
+    rules:
+      - "stable_key_order"
+      - "normalized_numbers"
+      - "normalized_nulls"
+      - "no_whitespace_dependency"
+  signature:
+    required: true
+    algorithm: "Ed25519"
+  idempotency:
+    event_id:
+      format: "uuid-v7"
+      required: true
+    dedup_window_seconds: 600
+
+workloads:
+  # Workload IDs are stable; do not rename.
+  - id: "W-A-speed-of-light"
+    scenario: "A"
+    name: "Speed of Light (Pure In-Memory)"
+    intent: "Find raw CPU/memory throughput ceiling and internal latency floor."
+    message_profile: "small_512b"
+    persistence:
+      enabled: false
+      mode: "fire_and_forget"
+    qos:
+      delivery: "at_most_once"
+      ack_required: false
+    transport:
+      protocol: "NATS"
+      stream: "memory_only_or_no_persist"
+    load_shape:
+      producers: 4
+      consumers: 4
+      concurrency: 2048
+      ramp:
+        type: "step"
+        step_seconds: 10
+        steps:
+          - rps: 100000
+          - rps: 200000
+          - rps: 300000
+          - rps: 400000
+      duration_seconds: 120
+    measurements:
+      primary_latency: "internal_latency_us"
+      secondary_latency: "transport_latency_us"
+    acceptance_criteria:
+      containerized:
+        throughput_msg_s:
+          min: 200000
+        internal_latency_us:
+          p50_max: 500
+          p95_max: 2000
+          p99_max: 5000
+          p99_9_max: 10000
+          max_max: 50000
+        error_budget:
+          publish_fail_rate_max: 0.001
+      tachyon:
+        throughput_msg_s:
+          min: 400000
+        internal_latency_us:
+          p50_max: 10
+          p95_max: 100
+          p99_max: 200
+          p99_9_max: 500
+          max_max: 1000
+        jitter_us:
+          p99_9_max: 200
+
+  - id: "W-B-standard-telemetry"
+    scenario: "B"
+    name: "Standard Telemetry (Balanced)"
+    intent: "Measure buffering + async persistence + ack under steady commercial load."
+    message_profile: "medium_1kb"
+    persistence:
+      enabled: true
+      mode: "async_write_buffered"
+      jetstream:
+        storage: "file"
+        replicas: 3
+        ack_policy: "explicit"
+    qos:
+      delivery: "at_least_once"
+      ack_required: true
+    load_shape:
+      producers: 8
+      consumers: 8
+      concurrency: 4096
+      ramp:
+        type: "linear"
+        from_rps: 10000
+        to_rps: 80000
+        over_seconds: 60
+      duration_seconds: 300
+    measurements:
+      primary_latency: "e2e_latency_ms"
+    acceptance_criteria:
+      containerized:
+        throughput_msg_s:
+          min: 50000
+        e2e_latency_ms:
+          p50_max: 20
+          p95_max: 80
+          p99_max: 200
+          p99_9_max: 350
+          max_max: 1000
+        error_budget:
+          end_to_end_fail_rate_max: 0.001
+          duplicate_rate_max: 0.001
+      tachyon:
+        throughput_msg_s:
+          min: 400000
+        e2e_latency_ms:
+          p50_max: 1
+          p95_max: 2
+          p99_max: 5
+          p99_9_max: 10
+          max_max: 50
+        jitter_ms:
+          p99_9_max: 0.05
+
+  - id: "W-C-heavy-consistency"
+    scenario: "C"
+    name: "Heavy Consistency (Critical Data)"
+    intent: "Find disk/IOPS bottleneck and tail latency impact with strong guarantees."
+    message_profile: "large_4kb"
+    persistence:
+      enabled: true
+      mode: "jetstream_wal_or_sync"
+      jetstream:
+        storage: "file"
+        replicas: 3
+        ack_policy: "explicit"
+        deduplication: true
+    qos:
+      delivery: "effectively_once"
+      ack_required: true
+    load_shape:
+      producers: 4
+      consumers: 4
+      concurrency: 2048
+      ramp:
+        type: "step"
+        step_seconds: 20
+        steps:
+          - rps: 5000
+          - rps: 10000
+          - rps: 20000
+      duration_seconds: 300
+    measurements:
+      primary_latency: "e2e_latency_ms"
+    acceptance_criteria:
+      containerized:
+        throughput_msg_s:
+          min: 20000
+        e2e_latency_ms:
+          p50_max: 40
+          p95_max: 150
+          p99_max: 400
+          p99_9_max: 800
+          max_max: 2000
+        correctness:
+          lost_event_count_max: 0
+          divergence_allowed: false
+      tachyon:
+        throughput_msg_s:
+          min: 80000
+        e2e_latency_ms:
+          p50_max: 2
+          p95_max: 10
+          p99_max: 20
+          p99_9_max: 50
+          max_max: 200
+        correctness:
+          lost_event_count_max: 0
+          divergence_allowed: false
+
+correctness_suites:
+  # These are mandatory for Class D.
+  - id: "C1-immune-rejection"
+    name: "Immune System Rejection & Quarantine Accuracy"
+    goal: "Invalid envelopes never enter main stream; they go to audit.violation."
+    test_cases:
+      - name: "schema_invalid"
+        invalid_ratio: 0.01
+        expected:
+          main_stream_admit_rate_max: 0.0
+          quarantine_capture_rate_min: 0.999
+      - name: "signature_invalid"
+        invalid_ratio: 0.01
+        expected:
+          quarantine_capture_rate_min: 0.999
+      - name: "inspira_rule_violation"
+        invalid_ratio: 0.01
+        expected:
+          quarantine_capture_rate_min: 0.999
+    acceptance_criteria:
+      overall:
+        false_negative_max: 0
+        false_positive_rate_max: 0.001
+
+  - id: "C2-idempotency-dedup"
+    name: "Deduplication / Idempotent Apply"
+    goal: "Repeated event_id does not create double side-effects."
+    injection:
+      duplicate_ratio: 0.01
+      duplicate_window_seconds: 600
+    acceptance_criteria:
+      state_worker:
+        double_apply_count_max: 0
+      stream:
+        duplicate_delivered_allowed: true
+        duplicate_effect_allowed: false
+
+  - id: "C3-crash-recovery"
+    name: "Crash + Recovery Correctness (E3 Hybrid)"
+    goal: "After restart, snapshot+delta replay produces deterministic state equal to log truth."
+    failure_injection:
+      - point: "after_persist_before_ack"
+      - point: "after_ack_before_snapshot_update"
+      - point: "during_snapshot_write"
+    acceptance_criteria:
+      recovery_time_seconds_max:
+        containerized: 10
+        tachyon: 2
+      state_equivalence:
+        required: true
+        method: "hash_of_materialized_state == hash(replay(log))"
+      lost_event_count_max: 0
+      orphaned_ack_max: 0
+
+  - id: "C4-backpressure"
+    name: "Backpressure & Overload Behavior"
+    goal: "Under overload, system fails gracefully and predictably."
+    overload_method:
+      - "increase_rps_until_p99_exceeds_threshold"
+      - "reduce_consumer_capacity_by_50_percent"
+    expected_behavior:
+      - "Ingress returns 429/503 with explicit reason"
+      - "No uncontrolled memory growth (bounded queues)"
+      - "No silent drops in verified stream"
+    acceptance_criteria:
+      memory_growth_percent_max: 25
+      verified_stream_drop_count_max: 0
+      ingress_shed_rate_min_when_overloaded: 0.1
+
+reporting:
+  output_formats:
+    - "json"
+    - "csv"
+    - "markdown_summary"
+  required_tables:
+    - "workload_results_by_run"
+    - "percentiles"
+    - "throughput_saturation_curve"
+    - "error_breakdown"
+    - "resource_utilization"
+    - "recovery_results"
+  required_plots:
+    - "latency_histogram"
+    - "latency_over_time"
+    - "throughput_over_time"
+  pass_fail:
+    rule: "A workload PASS requires meeting all acceptance_criteria for the declared deployment_mode."
+    overall_pass:
+      rule: "ALL workloads (W-A/W-B/W-C) + ALL correctness_suites (C1-C4) must PASS."
+
+workload_definition:
+  generator:
+    reference_implementation: "tachyon_benchmarker or dedicated loadgen"
+    requirements:
+      - "supports multi-producer multi-consumer"
+      - "supports ramp profiles (linear, step)"
+      - "records per-message timestamps and end-to-end correlation"
+      - "can inject invalid envelopes and duplicates"
+  payload_generation:
+    deterministic_seed_required: true
+    envelope_version: "2.0.0"
+    message_types:
+      - "intent.created"
+      - "state.mutation"
+      - "telemetry.heartbeat"
+      - "audit.violation"
+  tracing:
+    correlation_id_required: true
+    trace_sampling_rate: 1.0
+
+notes:
+  - "If any metric is not measurable in a mode, mark as N/A and provide justification."
+  - "Do not claim exactly-once unless proven under C3 with duplicate + crash injection."
+  - "All thresholds are negotiable, but changes must bump contract.version and be recorded."
