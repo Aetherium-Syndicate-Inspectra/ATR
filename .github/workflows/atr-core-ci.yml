@@ -1,0 +1,148 @@
+name: ATR Core CI
+
+on:
+  pull_request:
+    branches: ["main"]
+  push:
+    branches: ["main"]
+
+concurrency:
+  group: atr-core-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  changes:
+    name: detect-changes
+    runs-on: ubuntu-latest
+    outputs:
+      relevant: ${{ steps.filter.outputs.relevant }}
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Path filter
+        id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            relevant:
+              - '**/*.go'
+              - '**/*.rs'
+              - '**/*.py'
+              - '**/*.ts'
+              - 'specs/**/*.yaml'
+              - 'specs/**/*.yml'
+              - 'core/**/*.yaml'
+              - 'core/**/*.yml'
+              - 'gateway/**/*.yaml'
+              - 'gateway/**/*.yml'
+              - 'worker/**/*.yaml'
+              - 'worker/**/*.yml'
+              - 'specs/envelope_schema.json'
+              - 'specs/ruleset*.json'
+              - 'specs/**/ruleset*.json'
+              - 'specs/benchmark_contract.yaml'
+            docs_only:
+              - '**/*.md'
+              - '**/*.drawio'
+              - '**/*.svg'
+
+  python:
+    name: python
+    needs: [changes]
+    if: ${{ needs.changes.outputs.relevant == 'true' }}
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: "pip"
+
+      - name: Install tooling
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install ruff mypy pytest pyyaml jsonschema
+
+      # ---------------------------
+      # FAILING CHECKS (fail-fast)
+      # ---------------------------
+
+      - name: Validate YAML (specs/, configs/)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import pathlib, yaml
+
+          def load_yaml_tree(root: str) -> int:
+              p = pathlib.Path(root)
+              if not p.exists():
+                  print(f"[skip] {root}/ not found")
+                  return 0
+              files = list(p.rglob("*.yml")) + list(p.rglob("*.yaml"))
+              for f in files:
+                  yaml.safe_load(f.read_text(encoding="utf-8"))
+              print(f"[ok] {root}: {len(files)} yaml files")
+              return len(files)
+
+          load_yaml_tree("specs")
+          load_yaml_tree("configs")
+          PY
+
+      - name: Validate JSON Schemas (specs/**/*.json)
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, pathlib
+          from jsonschema import Draft202012Validator
+
+          specs = pathlib.Path("specs")
+          if not specs.exists():
+              print("[skip] specs/ not found")
+              raise SystemExit(0)
+
+          files = list(specs.rglob("*.json"))
+          for f in files:
+              obj = json.loads(f.read_text(encoding="utf-8"))
+              # If it looks like a JSON Schema, verify schema validity
+              if isinstance(obj, dict) and "$schema" in obj:
+                  Draft202012Validator.check_schema(obj)
+          print(f"[ok] specs json checked: {len(files)}")
+          PY
+
+      - name: Ruff (lint)
+        run: |
+          set -euo pipefail
+          # จำกัดสโคปให้ตรง repo ของคุณ (มี python/, api/, core/, internal/, tests/)
+          ruff check python api core internal tests scripts
+
+      - name: Mypy (type-check) — blocking
+        run: |
+          set -euo pipefail
+          # ถ้ายังไม่มี config, mypy จะ fail → นี่คือ failing check ตามที่คุณต้องการ
+          mypy python api core internal
+
+      - name: Pytest — blocking
+        run: |
+          set -euo pipefail
+          pytest -q
+
+  docs-only:
+    name: docs-only
+    needs: [changes]
+    if: ${{ needs.changes.outputs.relevant != 'true' }}
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "No source/schema changes detected; skipping lint/test checks."
