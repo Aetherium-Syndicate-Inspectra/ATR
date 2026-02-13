@@ -33,11 +33,17 @@ def submit_envelope(envelope: dict[str, Any]) -> dict[str, Any]:
         return {"accepted": True, "stream_sequence": ack.stream_sequence}
 
     quarantine_bytes = serialize_for_quarantine(envelope, result.canonical_envelope)
-    transport.publish(
+    quarantine_ack = transport.publish(
         canonical_envelope=quarantine_bytes,
         subject=config.immune.quarantine_subject,
         correlation_id=correlation_id,
     )
+    if not quarantine_ack.accepted:
+        raise HTTPException(
+            status_code=503,
+            detail=quarantine_ack.error_message or "quarantine publish rejected",
+        )
+
     status = 403 if "signature" in result.reason or "ruleset" in result.reason else 400
     raise HTTPException(status_code=status, detail=result.reason)
 

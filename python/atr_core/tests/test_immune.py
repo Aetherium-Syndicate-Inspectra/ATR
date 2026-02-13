@@ -87,4 +87,5 @@ def test_canonicalization_rejects_duplicate_keys_after_nfc_normalization() -> No
 
     result = pipeline.evaluate(env)
     assert not result.accepted
-    assert result.reason.endswith("CANON_DUPLICATE_KEY_AFTER_NORMALIZE")
+    assert "CANON_DUPLICATE_KEY_AFTER_NORMALIZATION" in result.reason
+    assert "CANON_DUPLICATE_KEY_AFTER_NORMALIZE" in result.reason

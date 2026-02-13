@@ -7,7 +7,12 @@ from typing import Any
 
 from jsonschema import Draft202012Validator
 
-from atr_core.core.canonicalization import CanonicalizationError, canonical_input, canonicalize_json
+from atr_core.core.canonicalization import (
+    CanonicalizationError,
+    canonical_input,
+    canonicalize_json,
+    legacy_canonicalization_code,
+)
 from atr_core.core.rules import Ruleset
 from atr_core.core.security import canonical_hash, verify_signature
 
@@ -33,7 +38,14 @@ class ImmunePipeline:
         try:
             canonical_bytes = canonicalize_json(canonical_input(envelope))
         except CanonicalizationError as err:
-            return ImmuneResult(False, f"canonicalization failed: {err.code}", b"")
+            legacy_code = legacy_canonicalization_code(err.code)
+            if legacy_code == err.code:
+                return ImmuneResult(False, f"canonicalization failed: {err.code}", b"")
+            return ImmuneResult(
+                False,
+                f"canonicalization failed: {err.code} (legacy: {legacy_code})",
+                b"",
+            )
 
         digest = canonical_hash(canonical_bytes)
         signature_ok = verify_signature(
