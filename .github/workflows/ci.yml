@@ -1,37 +1,68 @@
-name: ATR Core CI
+name: ATR Core CI (Python Package + Sidecar)
 
 on:
   pull_request:
-    paths:
-      - "**/*.py"
-      - "**/*.rs"
-      - "specs/**/*.yaml"
-      - "specs/**/*.yml"
-      - "specs/**/*.json"
-      - "configs/**/*.yaml"
-      - "configs/**/*.yml"
-      - "proto/**/*.proto"
-      - "python/**"
-      - "sidecar/**"
-      - ".github/workflows/ci.yml"
+    branches: ["main"]
   push:
     branches: ["main"]
-    paths:
-      - "**/*.py"
-      - "**/*.rs"
-      - "specs/**/*.yaml"
-      - "specs/**/*.yml"
-      - "specs/**/*.json"
-      - "configs/**/*.yaml"
-      - "configs/**/*.yml"
-      - "proto/**/*.proto"
-      - "python/**"
-      - "sidecar/**"
-      - ".github/workflows/ci.yml"
+
+concurrency:
+  group: atr-core-build-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
 
 jobs:
+  changes:
+    runs-on: ubuntu-latest
+    outputs:
+      python_related: ${{ steps.filter.outputs.python_related }}
+      rust_related: ${{ steps.filter.outputs.rust_related }}
+      schema_related: ${{ steps.filter.outputs.schema_related }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: filter
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            python_related:
+              - '**/*.py'
+              - 'python/**'
+              - 'api/**'
+              - 'core/**'
+              - 'gateway/**'
+              - 'worker/**'
+              - 'internal/**'
+              - 'tests/**'
+              - 'scripts/**'
+              - 'specs/**/*.yaml'
+              - 'specs/**/*.yml'
+              - 'specs/**/*.json'
+              - 'configs/**/*.yaml'
+              - 'configs/**/*.yml'
+            rust_related:
+              - '**/*.rs'
+              - 'sidecar/**'
+              - 'core/**'
+              - 'gateway/**'
+              - 'worker/**'
+              - 'specs/**/*.yaml'
+              - 'specs/**/*.yml'
+              - 'specs/**/*.json'
+            schema_related:
+              - 'specs/**/AkashicEnvelope*.json'
+              - 'specs/**/akashicenvelope*.json'
+              - 'specs/**/ruleset*.json'
+              - 'specs/**/ruleset*.yaml'
+              - 'specs/**/ruleset*.yml'
+              - 'specs/**/benchmark_contract*.yaml'
+              - 'specs/**/benchmark_contract*.yml'
+
   python:
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: ${{ needs.changes.outputs.python_related == 'true' || needs.changes.outputs.schema_related == 'true' }}
     defaults:
       run:
         working-directory: python
@@ -49,6 +80,8 @@ jobs:
 
   rust:
     runs-on: ubuntu-latest
+    needs: [changes]
+    if: ${{ needs.changes.outputs.rust_related == 'true' || needs.changes.outputs.schema_related == 'true' }}
     defaults:
       run:
         working-directory: sidecar/atb-et
@@ -57,3 +90,10 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - name: Check sidecar
         run: cargo check
+
+  docs-only:
+    runs-on: ubuntu-latest
+    needs: [changes]
+    if: ${{ needs.changes.outputs.python_related != 'true' && needs.changes.outputs.rust_related != 'true' && needs.changes.outputs.schema_related != 'true' }}
+    steps:
+      - run: echo "No source/schema changes detected; skipping package and sidecar checks."
