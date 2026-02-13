@@ -1,8 +1,34 @@
-profile: default
-transport:
-  backend: jetstream
-state:
-  truth_model: e3_hybrid
-security:
-  signature_required: true
-  schema_required: true
+atr:
+  mode: "containerized"
+  service:
+    host: "0.0.0.0"
+    port: 8080
+
+  # gRPC to ATB-ET sidecar
+  transport_grpc:
+    target: "unix:///tmp/atb_et.sock"   # best for same-machine latency
+    timeout_ms: 2000
+
+  # NATS/JetStream details (sidecar owns these, but ATR may still need info for docs/health)
+  nats:
+    url: "nats://127.0.0.1:4222"
+    stream_prefix: "aether"
+
+  envelope:
+    schema_path: "specs/envelope_schema.json"
+    version: "2.0.0"
+    max_payload_bytes: 4096
+    canonicalization:
+      stable_key_order: true
+      forbid_nan_inf: true
+      normalize_numbers: true
+
+  immune:
+    ruleset_path: "configs/inspirafirma_ruleset.json"
+    quarantine_subject: "aether.audit.violation"
+
+  state:
+    snapshot:
+      backend: "kv"
+      update_every_events: 1000
+      update_every_seconds: 300

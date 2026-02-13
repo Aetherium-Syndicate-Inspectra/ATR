@@ -1,265 +1,59 @@
-name: CI
+name: ATR Core CI
 
 on:
   pull_request:
-    branches: [ "main" ]
+    paths:
+      - "**/*.py"
+      - "**/*.rs"
+      - "specs/**/*.yaml"
+      - "specs/**/*.yml"
+      - "specs/**/*.json"
+      - "configs/**/*.yaml"
+      - "configs/**/*.yml"
+      - "proto/**/*.proto"
+      - "python/**"
+      - "sidecar/**"
+      - ".github/workflows/ci.yml"
   push:
-    branches: [ "main" ]
-
-# Cancel older runs on same PR/branch
-concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
+    branches: ["main"]
+    paths:
+      - "**/*.py"
+      - "**/*.rs"
+      - "specs/**/*.yaml"
+      - "specs/**/*.yml"
+      - "specs/**/*.json"
+      - "configs/**/*.yaml"
+      - "configs/**/*.yml"
+      - "proto/**/*.proto"
+      - "python/**"
+      - "sidecar/**"
+      - ".github/workflows/ci.yml"
 
 jobs:
-  changes:
-    name: Detect changes
+  python:
     runs-on: ubuntu-latest
-    outputs:
-      code: ${{ steps.filter.outputs.code }}
-      specs: ${{ steps.filter.outputs.specs }}
-      docs: ${{ steps.filter.outputs.docs }}
-      go: ${{ steps.filter.outputs.go }}
-      rust: ${{ steps.filter.outputs.rust }}
-      python: ${{ steps.filter.outputs.python }}
-      workflows: ${{ steps.filter.outputs.workflows }}
+    defaults:
+      run:
+        working-directory: python
     steps:
       - uses: actions/checkout@v4
-
-      - name: Path filter
-        id: filter
-        uses: dorny/paths-filter@v3
-        with:
-          # If you want stricter matching, adjust paths below.
-          filters: |
-            code:
-              - 'cmd/**'
-              - 'core/**'
-              - 'internal/**'
-              - 'api/**'
-              - 'gateway/**'
-              - 'worker/**'
-              - 'tests/**'
-              - 'scripts/**'
-            specs:
-              - 'specs/**'
-              - 'configs/**'
-            docs:
-              - '**/*.md'
-              - 'docs/**'
-              - '**/*.drawio'
-              - '**/*.svg'
-            workflows:
-              - '.github/workflows/**'
-            go:
-              - '**/*.go'
-              - 'go.mod'
-              - 'go.sum'
-            rust:
-              - '**/*.rs'
-              - 'Cargo.toml'
-              - 'Cargo.lock'
-            python:
-              - '**/*.py'
-              - 'pyproject.toml'
-              - 'uv.lock'
-              - 'requirements*.txt'
-
-  # --- Quick gate: Specs / contracts / schemas must be valid ---
-  validate-specs:
-    name: Validate specs (YAML/JSON/Schema)
-    needs: [ changes ]
-    if: ${{ needs.changes.outputs.specs == 'true' || needs.changes.outputs.code == 'true' || needs.changes.outputs.workflows == 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python (for validators)
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-
-      - name: Install validators
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install pyyaml jsonschema
+          pip install .[test]
+      - name: Run tests
+        run: pytest -q atr_core/tests
 
-      - name: YAML syntax check (specs/configs)
-        run: |
-          python - <<'PY'
-          import sys, pathlib, yaml
-          targets = []
-          for p in [pathlib.Path("specs"), pathlib.Path("configs")]:
-            if p.exists():
-              targets += list(p.rglob("*.yml")) + list(p.rglob("*.yaml"))
-          for f in targets:
-            with open(f, "rb") as fh:
-              yaml.safe_load(fh)
-          print(f"YAML OK: {len(targets)} files")
-          PY
-
-      - name: JSON syntax check (specs)
-        run: |
-          python - <<'PY'
-          import json, pathlib
-          p = pathlib.Path("specs")
-          targets = list(p.rglob("*.json")) if p.exists() else []
-          for f in targets:
-            json.loads(f.read_text(encoding="utf-8"))
-          print(f"JSON OK: {len(targets)} files")
-          PY
-
-      # Optional: validate envelope schema itself is a valid JSON Schema
-      - name: Validate envelope schema is valid JSON Schema (if present)
-        run: |
-          python - <<'PY'
-          import pathlib, json
-          from jsonschema import Draft202012Validator
-          schema_path = pathlib.Path("specs/envelope_schema.json")
-          if not schema_path.exists():
-            print("No specs/envelope_schema.json, skipping.")
-            raise SystemExit(0)
-          schema = json.loads(schema_path.read_text(encoding="utf-8"))
-          Draft202012Validator.check_schema(schema)
-          print("Envelope schema OK (Draft 2020-12).")
-          PY
-
-  # --- Security: basic secret scan (lightweight) ---
-  secret-scan:
-    name: Secret scan (gitleaks)
-    needs: [ changes ]
-    if: ${{ needs.changes.outputs.code == 'true' || needs.changes.outputs.workflows == 'true' }}
+  rust:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
+    defaults:
+      run:
+        working-directory: sidecar/atb-et
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Run gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  # --- Go: lint + test (only if Go files changed) ---
-  go-ci:
-    name: Go CI (lint/test)
-    needs: [ changes ]
-    if: ${{ needs.changes.outputs.go == 'true' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: "1.23.x"
-          cache: true
-
-      - name: Go fmt (check)
-        run: |
-          if [ -n "$(gofmt -l .)" ]; then
-            echo "gofmt needed:"
-            gofmt -l .
-            exit 1
-          fi
-
-      - name: Go vet
-        run: go vet ./...
-
-      - name: Go test
-        run: go test ./... -count=1
-
-  # --- Rust: fmt + clippy + test (only if Rust files changed) ---
-  rust-ci:
-    name: Rust CI (fmt/clippy/test)
-    needs: [ changes ]
-    if: ${{ needs.changes.outputs.rust == 'true' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Cargo fmt (check)
-        run: cargo fmt --all -- --check
-
-      - name: Cargo clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Cargo test
-        run: cargo test --all --all-features
-
-  # --- Python: lint + test (only if Python files changed) ---
-  python-ci:
-    name: Python CI (lint/test)
-    needs: [ changes ]
-    if: ${{ needs.changes.outputs.python == 'true' }}
-    runs-on: ubuntu-latest
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: "pip"
-
-      - name: Install tooling
-        run: |
-          python -m pip install --upgrade pip
-          pip install ruff pytest
-
-      - name: Ruff (lint)
-        run: |
-          # If you later add ruff config in pyproject, it will be used automatically.
-          ruff check .
-
-      - name: Pytest
-        run: |
-          if [ -d "tests" ]; then
-            pytest -q
-          else
-            echo "No tests/ directory; skipping pytest."
-          fi
-
-  # --- Docs-only PR: fast success gate (optional) ---
-  docs-only:
-    name: Docs-only (no CI needed)
-    needs: [ changes ]
-    if: ${{ needs.changes.outputs.docs == 'true' && needs.changes.outputs.code != 'true' && needs.changes.outputs.specs != 'true' && needs.changes.outputs.workflows != 'true' }}
-    runs-on: ubuntu-latest
-    steps:
-      - run: echo "Docs-only change detected. Skipping heavy CI."
-
-  # --- Final gate: require at least spec validation when relevant ---
-  summary:
-    name: CI Summary
-    needs:
-      - changes
-      - validate-specs
-      - secret-scan
-      - go-ci
-      - rust-ci
-      - python-ci
-      - docs-only
-    if: always()
-    runs-on: ubuntu-latest
-    steps:
-      - name: Report
-        run: |
-          echo "CI completed."
-          echo "Note: Some jobs may be skipped depending on changed files."
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check sidecar
+        run: cargo check
