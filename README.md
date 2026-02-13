@@ -53,6 +53,7 @@ tools/         Contract/performance helper tools
 
 - Technical specification: [`SPEC.md`](SPEC.md)
 - Contributor policy: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Newcomer onboarding checklist: [`docs/NEWCOMER_ONBOARDING_CHECKLIST.md`](docs/NEWCOMER_ONBOARDING_CHECKLIST.md)
 - Benchmark contract: [`specs/benchmark_contract.yaml`](specs/benchmark_contract.yaml)
 - Performance model: [`docs/AETHERBUS_TACHYON_SPEC_TH.md`](docs/AETHERBUS_TACHYON_SPEC_TH.md)
 - Formula estimator tool: [`tools/perf_estimator.py`](tools/perf_estimator.py)
