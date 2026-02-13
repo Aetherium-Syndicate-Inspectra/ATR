@@ -1,0 +1,6 @@
+{
+  "blocked_types": ["forbidden.event"],
+  "required_security_level_for_types": {
+    "state.mutation": "confidential"
+  }
+}

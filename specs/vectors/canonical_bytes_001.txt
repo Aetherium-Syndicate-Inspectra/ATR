@@ -1,0 +1,1 @@
+{"header":{"id":"018f3c3b-9b5f-7b2b-9f5c-0d2b4c2f8f11","source_agent":"agent_pubkey_hash_001","timestamp":1710000000000000000,"type":"intent.created","version":"2.0.0"},"meta":{"context_refs":["ctx:abc123","blob:def456"],"correlation_id":"corr-001","security_level":"public"},"payload":{"intent":"hello","priority":2}}

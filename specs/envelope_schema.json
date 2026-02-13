@@ -1,37 +1,69 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://atr.local/specs/envelope_schema.json",
-  "title": "AkashicEnvelopeV2",
+  "$id": "http://aetherium.genesis/schemas/envelope/v2",
+  "title": "AkashicEnvelope v2",
   "type": "object",
+  "additionalProperties": false,
   "required": ["header", "payload", "signature"],
   "properties": {
     "header": {
       "type": "object",
-      "required": ["id", "timestamp_ns", "source_agent"],
+      "additionalProperties": false,
+      "required": ["id", "timestamp", "source_agent", "type", "version"],
       "properties": {
         "id": {
           "type": "string",
-          "description": "UUIDv7 event identifier"
+          "description": "UUIDv7 (time-ordered) string"
         },
-        "timestamp_ns": {
+        "timestamp": {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "description": "Unix time in nanoseconds (telemetry; ordering uses broker seq)"
         },
         "source_agent": {
           "type": "string",
-          "minLength": 1
+          "minLength": 8,
+          "description": "Public key or identity hash"
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Event type e.g. intent.created, state.mutation"
+        },
+        "version": {
+          "type": "string",
+          "const": "2.0.0"
         }
-      },
-      "additionalProperties": true
+      }
+    },
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "correlation_id": { "type": "string" },
+        "causal_hash": {
+          "type": "string",
+          "description": "Hash of previous envelope or causal chain pointer"
+        },
+        "security_level": {
+          "type": "string",
+          "enum": ["public", "confidential", "secret"]
+        },
+        "context_refs": {
+          "type": "array",
+          "description": "Pointers to external context to avoid payload bloat",
+          "items": { "type": "string" }
+        }
+      }
     },
     "payload": {
-      "type": ["object", "array", "string", "number", "integer", "boolean", "null"]
+      "type": "object",
+      "description": "Type-specific payload. Must be validated by type schema registry."
     },
     "signature": {
       "type": "string",
-      "minLength": 1,
-      "description": "Ed25519 signature over canonical bytes"
+      "minLength": 16,
+      "description": "Ed25519 signature over canonical_bytes(header+meta+payload)"
     }
-  },
-  "additionalProperties": true
+  }
 }
