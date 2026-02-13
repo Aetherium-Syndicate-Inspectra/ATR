@@ -1,37 +1,39 @@
 # ATR Core Server (Class D)
 
-ATR (Aetherium Transmission & Retrieval) is a **Class D Deep Core Server**.
-It serves as a **Ground Truth Authority** for deterministic event admission, immutable truth recording, and canonical stream publication.
+ATR (Aetherium Transmission & Retrieval) คือ **Class D Deep Core Server** ที่ทำหน้าที่เป็น **Ground Truth Authority** สำหรับการรับ event แบบกำหนดผลได้ (deterministic admission), การบันทึกความจริงแบบแก้ไขย้อนหลังไม่ได้ (immutable truth), และการเผยแพร่สตรีมตามรูปแบบ canonical อย่างเคร่งครัด.
 
-ATR Core is not an application runtime and must remain business-logic agnostic.
+> ATR Core **ไม่ใช่** application runtime และต้องคงความเป็น business-logic agnostic ตลอดเวลา
 
-## Core Principles
+---
 
-- Determinism-first behavior
-- Immutable truth model
-- Mandatory validation and signature enforcement
-- Predictable failure behavior under stress
+## 1) System Structure (โครงสร้างระบบตามแกนหลัก)
 
-## Architecture Model
+ATR ใช้โมเดล **3-Axis Architecture**:
 
-ATR follows a **3-Axis Architecture**:
+1. **Transport Axis**  
+   รับ/ส่งข้อมูลผ่าน AetherBusExtreme / JetStream โดย sidecar ต้องคืน broker sequence acknowledgement เพื่อคงลำดับและความน่าเชื่อถือของการส่ง
+2. **Immune Axis**  
+   บังคับตรวจสอบทุก event ตามลำดับ: **schema → canonicalization → signature → ruleset → quarantine** (ห้าม bypass)
+3. **State Authority Axis (E3 Hybrid Truth)**  
+   Truth จริงอยู่ที่ immutable event log; snapshot เป็นมุมมองที่ rebuild ได้เสมอ
 
-1. **Transport** — AetherBusExtreme / JetStream backbone
-2. **Immune System** — schema + canonicalization + signature + ruleset enforcement
-3. **State Authority** — E3 Hybrid (`Immutable Log + Materialized Snapshot`)
+อ่านรายละเอียดเชิงลึกเพิ่มเติมที่ [`ARCHITECTURE.md`](ARCHITECTURE.md).
 
-See full architecture details in [`ARCHITECTURE.md`](ARCHITECTURE.md).
+---
 
-## Technical and Governance References
+## 2) Core Invariants (ข้อกำหนดที่ห้ามละเมิด)
 
-- Technical specification: [`SPEC.md`](SPEC.md)
-- Contributor policy: [`CONTRIBUTING.md`](CONTRIBUTING.md)
-- Invariants policy (normative): [`AGENTS.md`](AGENTS.md)
-- Benchmark contract: [`specs/benchmark_contract.yaml`](specs/benchmark_contract.yaml)
-- Three-tier performance model: [`docs/AETHERBUS_TACHYON_SPEC_TH.md`](docs/AETHERBUS_TACHYON_SPEC_TH.md)
-- Formula estimator tool: [`tools/perf_estimator.py`](tools/perf_estimator.py)
+- Canonicalization ต้องนิยามที่ระดับ bytes และ signature ต้องลงนามบน canonical bytes เท่านั้น
+- Delivery model เป็น **effectively-once** ผ่าน `event_id` + idempotent apply
+- ห้ามอ้าง exactly-once หากไม่มี failure-injection proof
+- External gates มีได้เพียง 4 จุด: **Ingress / Stream / Query / Admin**
+- Signature verification, schema validation, quarantine flow ต้องเป็น mandatory ทั้งหมด
 
-## Repository Layout
+แหล่งอ้างอิงนโยบายหลัก: [`AGENTS.md`](AGENTS.md)
+
+---
+
+## 3) Repository Layout
 
 ```text
 python/        ATR Core Python package (API, immune pipeline, tests)
@@ -45,7 +47,44 @@ scripts/       Benchmark and verification entrypoints
 tools/         Contract/performance helper tools
 ```
 
-## Status
+---
 
-This repository is structured for production-grade governance with Class D constraints.
-Implementation should evolve without violating deterministic and security invariants.
+## 4) Key References
+
+- Technical specification: [`SPEC.md`](SPEC.md)
+- Contributor policy: [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- Benchmark contract: [`specs/benchmark_contract.yaml`](specs/benchmark_contract.yaml)
+- Performance model: [`docs/AETHERBUS_TACHYON_SPEC_TH.md`](docs/AETHERBUS_TACHYON_SPEC_TH.md)
+- Formula estimator tool: [`tools/perf_estimator.py`](tools/perf_estimator.py)
+
+---
+
+## 5) Guidance for Safe Fixes & Improvements
+
+### 5.1 เมื่อแก้ README / เอกสาร
+- ปรับข้อความให้สอดคล้อง invariant เดิมโดยไม่เปลี่ยน semantics
+- ถ้าปรับคำศัพท์เชิงสัญญา (เช่น effectively-once, E3, canonical bytes) ให้คงความหมายเดิม
+- ไม่จำเป็นต้องรัน test/lint หากเปลี่ยนเฉพาะไฟล์เอกสาร
+
+### 5.2 เมื่อแก้ core logic
+- รักษา determinism: หลีกเลี่ยง logic ที่ขึ้นกับเวลา/สุ่ม/ลำดับที่ไม่คงที่
+- ห้ามแตะเส้นทาง bypass ของ schema/canonical/signature/ruleset
+- รักษา idempotency และ dedup ด้วย `event_id`
+- ห้ามเปลี่ยนโมเดล E3 (Immutable Log + Rebuildable Snapshot)
+
+### 5.3 เมื่อแก้ benchmark/performance
+- หากมีผลต่อ acceptance criteria ต้องอัปเดตเวอร์ชันใน `benchmark_contract.yaml`
+- ห้ามลดมาตรฐาน P99/P99.9 ที่ระบุในสัญญา
+
+### 5.4 Checklist ก่อน merge
+- [ ] ไม่มีการลดทอน invariant ด้าน security/validation
+- [ ] ไม่มีการแอบเปลี่ยน semantics ของ truth model
+- [ ] เอกสารอ้างอิงไฟล์ที่ถูกต้องและอัปเดตตรงกับโครงสร้างจริง
+- [ ] หากแตะโค้ด production-critical มีหลักฐานการทดสอบที่เพียงพอ
+
+---
+
+## 6) Current Status
+
+Repository นี้วางโครงเพื่อ production-grade governance ภายใต้ข้อจำกัดของ Class D อย่างเคร่งครัด.
+การปรับปรุงต้องทำแบบ incremental และพิสูจน์ได้ว่า **ไม่ละเมิด determinism, immutability, strict validation และ E3 truth model**.
