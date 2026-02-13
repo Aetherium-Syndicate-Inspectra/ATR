@@ -2,146 +2,135 @@ syntax = "proto3";
 
 package atr.transport.v1;
 
-option go_package = "atr/transport/v1;transportv1";
+option go_package = "atr/transport/v1";
+option java_multiple_files = true;
 
-// ---------------------------
-// Core idea
-// - ATR (Python) does Immune + State Authority (E3)
-// - ATB-ET sidecar (Rust) does transport: publish/subscribe + JetStream persistence adapter
-// - ATR submits canonical envelope bytes to sidecar.
-// - Sidecar returns an ack with stream/sequence info for determinism.
-// ---------------------------
+// ======================================================
+// ENUMS
+// ======================================================
 
-service AtrTransport {
-  // Publish a verified, canonical envelope into the bus.
-  rpc Publish(PublishRequest) returns (PublishResponse);
-
-  // Subscribe to subjects (fanout real-time feed) for executors/consumers.
-  rpc Subscribe(SubscribeRequest) returns (stream EnvelopeFrame);
-
-  // Query health / readiness (Raft, storage, stream lag).
-  rpc Health(HealthRequest) returns (HealthResponse);
-
-  // Optional: Request-Reply helper for low-latency command style.
-  rpc RequestReply(RequestReplyRequest) returns (RequestReplyResponse);
+enum SubmitMode {
+  SUBMIT_MODE_UNSPECIFIED = 0;
+  INLINE_ONLY = 1;
+  ALLOW_ARENA_REF = 2;
+  ALLOW_SHM_REF = 3;
 }
 
-// ---------------------------
-// Publish
-// ---------------------------
-
-message PublishRequest {
-  // Canonical bytes of AkashicEnvelope (JSON canonical bytes or msgpack/proto canonical bytes).
-  bytes canonical_envelope = 1;
-
-  // NATS subject target. Usually "aether.stream.<domain>.<event>".
-  string subject = 2;
-
-  // If true, sidecar must ensure persistence before acking.
-  // "persisted=true" corresponds to JetStream ack after write.
-  bool require_persisted_ack = 3;
-
-  // Optional partition key or routing hint.
-  string partition_key = 4;
-
-  // Optional: correlation id for tracing (duplicated in envelope meta too).
-  string correlation_id = 5;
+enum Decision {
+  DECISION_UNSPECIFIED = 0;
+  ALLOW = 1;
+  DROP = 2;
+  THROTTLED = 3;
 }
 
-message PublishResponse {
-  bool accepted = 1;
+// ======================================================
+// CORE PACKET MESSAGE (CONTROL PLANE → DATA PLANE)
+// ======================================================
 
-  // Persistence acknowledgement details.
-  bool persisted = 2;
+message TachyonPacket {
+  uint64 flags = 1;
+  uint32 topic_id = 2;
+  uint32 sender_id = 3;
 
-  // Broker-assigned sequence numbers (authoritative ordering).
-  uint64 stream_sequence = 3;
-  uint64 consumer_sequence = 4;
+  // Fixed 48 bytes payload.
+  bytes inline_data = 4;
+  // MUST be <= 48 bytes if used.
 
-  // Echo subject + server time (for telemetry, NOT authoritative ordering).
-  string subject = 5;
-  int64 server_time_unix_ns = 6;
+  // Arena reference.
+  ArenaRef arena_ref = 5;
 
-  // Error channel
-  string error_code = 7;   // e.g. "BACKPRESSURE", "STREAM_DOWN", "INVALID_SUBJECT"
-  string error_message = 8;
+  // Shared memory reference.
+  ShmRef shm_ref = 6;
 }
 
-// ---------------------------
-// Subscribe
-// ---------------------------
-
-message SubscribeRequest {
-  // Subject filter, e.g. "aether.stream.>" or "aether.stream.order.*"
-  string subject_filter = 1;
-
-  // If true, start at earliest available (replay).
-  bool deliver_all = 2;
-
-  // If deliver_all=false, start at last value / new only.
-  bool deliver_new_only = 3;
-
-  // Optional: durable name for JetStream consumer semantics.
-  string durable_name = 4;
-
-  // Optional: max in-flight frames server will send before expecting client to keep up.
-  uint32 max_in_flight = 5;
-
-  // Optional: enforce only specific tenants/domains.
-  string tenant_id = 6;
+message ArenaRef {
+  uint32 arena_id = 1;
+  uint64 offset = 2;
+  uint32 length = 3;
+  uint64 checksum = 4;
 }
 
-message EnvelopeFrame {
-  // Raw canonical envelope bytes.
-  bytes canonical_envelope = 1;
-
-  // Metadata from broker.
-  string subject = 2;
-  uint64 stream_sequence = 3;
-
-  // For tracing/diagnostics.
-  int64 broker_time_unix_ns = 4;
+message ShmRef {
+  uint64 segment_id = 1;
+  uint64 offset = 2;
+  uint32 length = 3;
+  uint64 checksum = 4;
 }
 
-// ---------------------------
-// Health
-// ---------------------------
+// ======================================================
+// BATCH SUBMIT
+// ======================================================
 
-message HealthRequest {
-  bool include_metrics = 1;
+message BatchSubmitRequest {
+  uint64 request_id = 1;
+
+  // Optional governance override flags.
+  bool governance_required = 2;
+
+  // Preferred submission mode.
+  SubmitMode mode = 3;
+
+  // Micro-batch.
+  repeated TachyonPacket packets = 4;
+
+  // Timestamp at control plane.
+  uint64 submit_timestamp_ns = 5;
 }
 
-message HealthResponse {
-  bool ok = 1;
+message BatchSubmitResponse {
+  uint64 request_id = 1;
 
-  // High-level readiness
-  bool nats_connected = 2;
-  bool jetstream_ready = 3;
+  uint32 accepted = 2;
+  uint32 dropped = 3;
+  uint32 throttled = 4;
 
-  // Backpressure indicator (true means producers should shed).
-  bool overloaded = 4;
+  repeated PacketResult results = 5;
 
-  // Optional metrics
-  uint64 publish_rate_msg_s = 5;
-  uint64 subscribe_rate_msg_s = 6;
-  uint64 backlog_msgs = 7;
-
-  string version = 8;
+  uint64 processing_time_ns = 6;
 }
 
-// ---------------------------
-// Request-Reply (optional)
-// ---------------------------
-
-message RequestReplyRequest {
-  string subject = 1;
-  bytes payload = 2;
-  uint32 timeout_ms = 3;
+message PacketResult {
+  uint32 index = 1;
+  Decision decision = 2;
 }
 
-message RequestReplyResponse {
-  bool ok = 1;
-  bytes payload = 2;
-  string error_code = 3;
-  string error_message = 4;
+// ======================================================
+// RULE UPDATE (RCU)
+// ======================================================
+
+message GovernanceUpdateRequest {
+  uint64 version = 1;
+
+  repeated TopicRateLimit topic_limits = 2;
+  repeated SenderQuota sender_quotas = 3;
+  repeated uint32 allowlist_topics = 4;
+}
+
+message TopicRateLimit {
+  uint32 topic_id = 1;
+  uint64 capacity = 2;
+  uint64 refill_rate = 3;
+}
+
+message SenderQuota {
+  uint32 sender_id = 1;
+  uint32 max_in_flight = 2;
+}
+
+message GovernanceUpdateResponse {
+  uint64 version = 1;
+  bool success = 2;
+  string error_message = 3;
+}
+
+// ======================================================
+// SERVICE DEFINITION
+// ======================================================
+
+service ATRTransport {
+  // High-performance batch submit.
+  rpc SubmitBatch(BatchSubmitRequest) returns (BatchSubmitResponse);
+
+  // Governance RCU swap.
+  rpc UpdateGovernance(GovernanceUpdateRequest) returns (GovernanceUpdateResponse);
 }
