@@ -1,0 +1,82 @@
+{
+  "allowed_metrics": [
+    "atr_cp_submit_calls_total",
+    "atr_cp_submit_failures_total",
+    "atr_cp_batch_size_current",
+    "atr_cp_batch_build_duration_seconds",
+
+    "atr_dp_packets_processed_total",
+    "atr_dp_packets_dropped_total",
+    "atr_dp_packets_throttled_total",
+    "atr_dp_queue_depth",
+    "atr_dp_queue_full_total",
+    "atr_dp_batch_size",
+    "atr_dp_batch_duration_seconds",
+
+    "atr_gov_eval_total",
+    "atr_gov_eval_duration_seconds",
+    "atr_gov_ruleset_version",
+    "atr_gov_ruleset_swaps_total",
+    "atr_gov_ruleset_validation_failures_total",
+
+    "atr_arena_used_bytes",
+    "atr_arena_capacity_bytes",
+    "atr_arena_alloc_failures_total",
+    "atr_arena_wraparounds_total",
+
+    "atr_tx_dispatch_total",
+    "atr_tx_errors_total",
+    "atr_tx_backlog",
+    "atr_tx_dispatch_duration_seconds",
+
+    "atr_tx_rdma_posts_total",
+    "atr_tx_rdma_completions_total",
+    "atr_tx_rdma_cq_errors_total",
+    "atr_tx_rdma_cq_poll_cycles_total",
+
+    "atr_tx_uring_submits_total",
+    "atr_tx_uring_completions_total",
+    "atr_tx_uring_errors_total",
+
+    "atr_persist_writes_total",
+    "atr_persist_write_duration_seconds",
+    "atr_persist_errors_total",
+    "atr_persist_backlog",
+
+    "atr_bp_state",
+    "atr_bp_state_changes_total",
+    "atr_bp_recommended_batch_size"
+  ],
+  "allowed_label_keys": [
+    "shard",
+    "worker",
+    "transport",
+    "decision",
+    "reason",
+    "priority",
+    "mode",
+    "phase",
+    "component",
+    "from",
+    "to"
+  ],
+  "forbidden_label_keys": [
+    "topic",
+    "topic_id",
+    "sender",
+    "sender_id",
+    "user_id",
+    "request_id",
+    "correlation_id",
+    "envelope_id",
+    "session",
+    "path",
+    "url",
+    "exception",
+    "error",
+    "message"
+  ],
+  "counter_must_end_with": [
+    "_total"
+  ]
+}
