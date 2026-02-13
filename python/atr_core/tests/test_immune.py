@@ -58,7 +58,7 @@ def test_signature_verify_ed25519() -> None:
 def test_quarantine_routing() -> None:
     sk = SigningKey.generate()
     env = _envelope(sk)
-    env["signature"] = "invalid"
+    env["signature"] = _b64u(b"0" * 64)
     pipeline = ImmunePipeline("specs/envelope_schema.json", "configs/inspirafirma_ruleset.json")
     result = pipeline.evaluate(env)
     assert not result.accepted
@@ -74,3 +74,17 @@ def test_canonicalization_rejects_nan() -> None:
     result = pipeline.evaluate(env)
     assert not result.accepted
     assert result.reason.endswith("CANON_INVALID_NUMBER")
+
+
+def test_canonicalization_rejects_duplicate_keys_after_nfc_normalization() -> None:
+    # "é" can be represented either as a single codepoint or as "e" + combining accent.
+    value = {"é": 1, "e\u0301": 2}
+
+    pipeline = ImmunePipeline("specs/envelope_schema.json", "configs/inspirafirma_ruleset.json")
+    sk = SigningKey.generate()
+    env = _envelope(sk)
+    env["payload"] = value
+
+    result = pipeline.evaluate(env)
+    assert not result.accepted
+    assert result.reason.endswith("CANON_DUPLICATE_KEY_AFTER_NORMALIZE")

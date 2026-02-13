@@ -31,7 +31,13 @@ def _normalize(value: Any) -> Any:
         for key, inner in value.items():
             if not isinstance(key, str):
                 raise CanonicalizationError("CANON_NON_STRING_KEY", "map key must be string")
-            normalized[unicodedata.normalize("NFC", key)] = _normalize(inner)
+            normalized_key = unicodedata.normalize("NFC", key)
+            if normalized_key in normalized:
+                raise CanonicalizationError(
+                    "CANON_DUPLICATE_KEY_AFTER_NORMALIZE",
+                    "duplicate map key after NFC normalization",
+                )
+            normalized[normalized_key] = _normalize(inner)
         return normalized
     raise CanonicalizationError("CANON_FORBIDDEN_TYPE", f"unsupported type: {type(value)!r}")
 
