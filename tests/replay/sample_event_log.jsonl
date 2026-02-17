@@ -1,0 +1,4 @@
+{"payload":{"op":"set","key":"tenant","value":"a"}}
+{"payload":{"op":"incr","key":"counter","value":2}}
+{"payload":{"op":"incr","key":"counter","value":5}}
+{"payload":{"op":"set","key":"mode","value":"strict"}}

@@ -37,7 +37,8 @@ ATR ใช้โมเดล **3-Axis Architecture**:
 
 ```text
 python/        ATR Core Python package (API, immune pipeline, tests)
-sidecar/       ATB-ET Rust transport adapter
+rust/          Tachyon Data Plane core (hot-path packet/rules engine, PyO3 bridge)
+sidecar/       ATB-ET Rust transport/persistence adapter
 proto/         Transport protocol contracts
 specs/         Contracts and protocol specifications
 configs/       Deployment/runtime profiles
@@ -56,8 +57,10 @@ tools/         Contract/performance helper tools
 - Contributor policy: [`CONTRIBUTING.md`](CONTRIBUTING.md)
 - Newcomer onboarding checklist: [`docs/NEWCOMER_ONBOARDING_CHECKLIST.md`](docs/NEWCOMER_ONBOARDING_CHECKLIST.md)
 - Benchmark contract: [`specs/benchmark_contract.yaml`](specs/benchmark_contract.yaml)
+- Formal byte-level contracts: [`specs/formal/`](specs/formal)
 - Performance model: [`docs/AETHERBUS_TACHYON_SPEC_TH.md`](docs/AETHERBUS_TACHYON_SPEC_TH.md)
 - Main performance report: [`reports/atr_performance_report.md`](reports/atr_performance_report.md)
+- Snapshot determinism proof script: [`scripts/prove_snapshot_determinism.py`](scripts/prove_snapshot_determinism.py)
 - Formula estimator tool: [`tools/perf_estimator.py`](tools/perf_estimator.py)
 
 ---

@@ -23,21 +23,27 @@ def submit_envelope(envelope: dict[str, Any]) -> dict[str, Any]:
     correlation_id = envelope.get("meta", {}).get("correlation_id", "")
 
     if result.accepted:
-        ack = transport.publish(
-            canonical_envelope=result.canonical_envelope,
-            subject=f"aether.stream.core.{envelope['header']['type']}",
-            correlation_id=correlation_id,
-        )
+        try:
+            ack = transport.publish(
+                canonical_envelope=result.canonical_envelope,
+                subject=f"aether.stream.core.{envelope['header']['type']}",
+                correlation_id=correlation_id,
+            )
+        except Exception as exc:  # pragma: no cover - defensive transport boundary
+            raise HTTPException(status_code=503, detail=f"publish unavailable: {exc}") from exc
         if not ack.accepted:
             raise HTTPException(status_code=503, detail=ack.error_message or "publish rejected")
         return {"accepted": True, "stream_sequence": ack.stream_sequence}
 
     quarantine_bytes = serialize_for_quarantine(envelope, result.canonical_envelope)
-    quarantine_ack = transport.publish(
-        canonical_envelope=quarantine_bytes,
-        subject=config.immune.quarantine_subject,
-        correlation_id=correlation_id,
-    )
+    try:
+        quarantine_ack = transport.publish(
+            canonical_envelope=quarantine_bytes,
+            subject=config.immune.quarantine_subject,
+            correlation_id=correlation_id,
+        )
+    except Exception as exc:  # pragma: no cover - defensive transport boundary
+        raise HTTPException(status_code=503, detail=f"quarantine publish unavailable: {exc}") from exc
     if not quarantine_ack.accepted:
         raise HTTPException(
             status_code=503,

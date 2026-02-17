@@ -49,6 +49,29 @@ class StubTransport:
         return self.ack
 
 
+@dataclass
+class CrashTransport:
+    error: RuntimeError
+
+    def publish(self, canonical_envelope: bytes, subject: str, correlation_id: str = "") -> Ack:  # noqa: ARG002
+        raise self.error
+
+
+def test_submit_returns_503_when_quarantine_transport_crashes(monkeypatch) -> None:
+    monkeypatch.setattr(
+        app_module,
+        "immune",
+        StubImmune(ImmuneResult(False, "signature verification failed", b'{"header":{"id":"x"}}')),
+    )
+    monkeypatch.setattr(app_module, "transport", CrashTransport(RuntimeError("broker disconnected")))
+
+    with pytest.raises(HTTPException) as exc:
+        app_module.submit_envelope({"meta": {}, "header": {"type": "state.mutation"}})
+
+    assert exc.value.status_code == 503
+    assert "quarantine publish unavailable" in exc.value.detail
+
+
 def test_submit_returns_503_when_quarantine_publish_is_rejected(monkeypatch) -> None:
     monkeypatch.setattr(
         app_module,
